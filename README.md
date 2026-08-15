@@ -1,6 +1,6 @@
-Estructura de carpetas inicial
+## 📁 Estructura del proyecto
 
-
+```text
 civicmesh/
 │
 ├── README.md
@@ -12,7 +12,6 @@ civicmesh/
 │
 ├── src/
 │   └── civicmesh/
-│       │
 │       ├── __init__.py
 │       ├── main.py
 │       │
@@ -32,7 +31,6 @@ civicmesh/
 │       │   └── forwarding.py
 │       │
 │       ├── domains/
-│       │   │
 │       │   ├── crimes/
 │       │   │   ├── __init__.py
 │       │   │   ├── generator.py
