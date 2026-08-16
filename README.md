@@ -99,6 +99,7 @@ civicmesh/
 │
 └── runs/
     └── .gitkeep
+```
 
 ## Diseño del Protocolo Gossip y Membresía
 
@@ -144,7 +145,7 @@ El estado de la red se almacena en memoria dentro del diccionario `peers_view`. 
 2. **Filtrado de Zombis:** Si la marca de tiempo `last_seen` entrante supera el umbral de `timeout`, el registro se descarta de inmediato para evitar reincorporaciones falsas.
 3. **Inserción y Actualización:** Si el nodo es nuevo, se inserta en el diccionario; si ya existe, su `last_seen` solo se actualiza si el valor entrante es estrictamente más reciente.
 4. **Purga de Fallos:** Un barrido periódico elimina del diccionario cualquier nodo cuya inactividad cumpla:
-$$\text{ahora} - \text{last\_seen} > \text{timeout}$$
+`ahora - last_seen > timeout`
 
 
 
