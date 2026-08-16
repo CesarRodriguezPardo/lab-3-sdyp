@@ -1,4 +1,86 @@
-## 📁 Estructura del proyecto
+# CivicMesh
+
+Red P2P distribuida basada en el protocolo Gossip para descubrimiento de membresía y difusión de eventos Pub/Sub.
+
+## Requisitos e Instalación
+
+### Requisitos Previos
+
+* Python 3.10 o superior
+* `pip` y `python3-venv`
+
+### Configuración del Entorno
+
+```bash
+
+# Crear y activar entorno virtual
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Instalar dependencias
+pip install -r requirements.txt
+
+```
+
+---
+
+## Guía de Ejecución
+
+### 1. Iniciar un Nodo Individual
+
+Para ejecutar un nodo local en un puerto específico:
+
+```bash
+python3 -m src.civicmesh.main --port 8000
+
+```
+
+### Parámetros Configurables
+
+| Parámetro | Tipo | Defecto | Descripción |
+| --- | --- | --- | --- |
+| `--host` | `str` | `127.0.0.1` | Dirección IP donde escuchará el nodo. |
+| `--port` | `int` | *Requerido* | Puerto TCP local para el servidor del nodo. |
+| `--hostfile` | `str` | `hostfile.txt` | Ruta al archivo con nodos semilla conocidos. |
+| `--fanout` | `int` | `2` | Cantidad de peers a contactar por ciclo de gossip. |
+| `--timeout` | `float` | `6.0` | Umbral (en segundos) para declarar un nodo caído. |
+
+### 2. Prueba Malla Local (Múltiples Nodos)
+
+Para probar el descubrimiento dinámico y la tolerancia a fallos en una máquina local, abre 3 terminales distintas:
+
+```bash
+# Terminal 1 (Nodo Semilla inicial)
+python3 -m src.civicmesh.main --port 8000
+
+# Terminal 2 (Nodo Secundario)
+python3 -m src.civicmesh.main --port 8001
+
+# Terminal 3 (Nodo Secundario)
+python3 -m src.civicmesh.main --port 8002
+
+```
+
+---
+
+## Pruebas Unitarias
+
+La suite de pruebas evalúa el mantenimiento de la vista parcial, la correcta fusión de estados y la detección de nodos caídos por timeout.
+
+```bash
+# Ejecutar todas las pruebas unitarias
+python3 -m pytest
+
+# Ejecutar con salida detallada
+pytest -v
+
+```
+
+> **Nota:** Si ejecutas `pytest` directamente y encuentras errores de importación de módulos, asegúrate de tener un archivo `conftest.py` en la raíz del repositorio o ejecuta con `python3 -m pytest`.
+
+---
+
+## 📁 Estructura del Proyecto
 
 ```text
 civicmesh/
@@ -9,6 +91,7 @@ civicmesh/
 ├── docker-compose.yml
 ├── requirements.txt
 ├── .gitignore
+├── conftest.py
 │
 ├── src/
 │   └── civicmesh/
@@ -69,43 +152,21 @@ civicmesh/
 │
 ├── data/
 │   └── air_quality/
-│       ├── README.md
-│       └── ... archivos CSV/JSON ...
+│       └── README.md
 │
-├── frontend/
-│   ├── app.py
-│   └── ...
-│
-├── scripts/
-│   ├── run_local.sh
-│   ├── run_compose.sh
-│   │
-│   ├── slurm/
-│   │   ├── run_civicmesh.sbatch
-│   │   ├── start_peers.sh
-│   │   └── start_publishers.sh
-│   │
-│   ├── data/
-│   │   └── download_air_quality.py
-│   │
-│   └── agents/
-│       ├── documenter/
-│       ├── bug_reviewer/
-│       └── mr_reviewer/
-│
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-│
-└── runs/
-    └── .gitkeep
+└── scripts/
+    ├── run_local.sh
+    └── run_compose.sh
+
 ```
+
+---
 
 ## Diseño del Protocolo Gossip y Membresía
 
 ### 1. Protocolo de Comunicación (Payload JSON)
 
-Para garantizar la interoperabilidad de la red distribuidas, la comunicación se realiza mediante mensajes estructurados en formato JSON a través de TCP.
+Para garantizar la interoperabilidad de la red distribuida, la comunicación se realiza mediante mensajes estructurados en formato JSON a través de TCP:
 
 ```json
 {
@@ -146,8 +207,6 @@ El estado de la red se almacena en memoria dentro del diccionario `peers_view`. 
 3. **Inserción y Actualización:** Si el nodo es nuevo, se inserta en el diccionario; si ya existe, su `last_seen` solo se actualiza si el valor entrante es estrictamente más reciente.
 4. **Purga de Fallos:** Un barrido periódico elimina del diccionario cualquier nodo cuya inactividad cumpla:
 `ahora - last_seen > timeout`
-
-
 
 ---
 
