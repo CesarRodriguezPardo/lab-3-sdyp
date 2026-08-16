@@ -1,0 +1,39 @@
+geography:
+  level: comuna
+
+  topics:
+    - Santiago
+    - Providencia
+    - Ñuñoa
+    - Maipú
+    - Las Condes
+    - La Florida
+
+  neighbors:
+    Santiago:
+      - Providencia
+      - Maipú
+
+    Providencia:
+      - Santiago
+      - Ñuñoa
+      - Las Condes
+
+    Ñuñoa:
+      - Providencia
+      - La Florida
+      - Las Condes
+
+    Maipú:
+      - Santiago
+      - La Florida
+
+    Las Condes:
+      - Providencia
+      - Ñuñoa
+      - La Florida
+
+    La Florida:
+      - Ñuñoa
+      - Maipú
+      - Las Condes
