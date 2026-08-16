@@ -31,7 +31,7 @@ pip install -r requirements.txt
 Para ejecutar un nodo local en un puerto específico:
 
 ```bash
-python3 -m src.civicmesh.main --port 8000
+python3 -m CivicMesh.src.main --port 8000
 
 ```
 
@@ -51,13 +51,13 @@ Para probar el descubrimiento dinámico y la tolerancia a fallos en una máquina
 
 ```bash
 # Terminal 1 (Nodo Semilla inicial)
-python3 -m src.civicmesh.main --port 8000
+python3 -m CivicMesh.src.main --port 8000
 
 # Terminal 2 (Nodo Secundario)
-python3 -m src.civicmesh.main --port 8001
+python3 -m CivicMesh.src.main --port 8001
 
 # Terminal 3 (Nodo Secundario)
-python3 -m src.civicmesh.main --port 8002
+python3 -m CivicMesh.src.main --port 8002
 
 ```
 
@@ -94,40 +94,39 @@ civicmesh/
 ├── conftest.py
 │
 ├── src/
-│   └── civicmesh/
-│       ├── __init__.py
-│       ├── main.py
-│       │
-│       ├── network/
-│       │   ├── peer.py
-│       │   └── gossip.py
-│       │
-│       ├── pubsub/
-│       │   ├── __init__.py
-│       │   ├── message.py
-│       │   ├── topic.py
-│       │   ├── subscription.py
-│       │   ├── router.py
-│       │   └── forwarding.py
-│       │
-│       ├── domains/
-│       │   ├── crimes/
-│       │   │   ├── __init__.py
-│       │   │   ├── generator.py
-│       │   │   └── perception.py
-│       │   │
-│       │   └── air_quality/
-│       │       ├── __init__.py
-│       │       ├── replay.py
-│       │       ├── perception.py
-│       │       └── dataset.py
-│       │
-│       ├── aggregation/
-│       │   ├── __init__.py
-│       │   ├── state.py
-│       │   └── metrics.py
-│       │
-│       └── config/
+│   ├── __init__.py
+│   ├── main.py
+│   │
+│   ├── network/
+│   │   ├── peer.py
+│   │   └── gossip.py
+│   │
+│   ├── pubsub/
+│   │   ├── __init__.py
+│   │   ├── message.py
+│   │   ├── topic.py
+│   │   ├── subscription.py
+│   │   ├── router.py
+│   │   └── forwarding.py
+│   │
+│   ├── domains/
+│   │   ├── crimes/
+│   │   │   ├── __init__.py
+│   │   │   ├── generator.py
+│   │   │   └── perception.py
+│   │   │
+│   │   └── air_quality/
+│   │       ├── __init__.py
+│   │       ├── replay.py
+│   │       ├── perception.py
+│   │       └── dataset.py
+│   │
+│   ├── aggregation/
+│   │   ├── __init__.py
+│   │   ├── state.py
+│   │   └── metrics.py
+│   │
+│   └── config/
 │           ├── __init__.py
 │           └── loader.py
 │
@@ -155,8 +154,27 @@ civicmesh/
 │       └── README.md
 │
 └── scripts/
-    ├── run_local.sh
-    └── run_compose.sh
+|   ├── run_local.sh
+|   └── run_compose.sh
+│   ├── slurm/
+│   │   ├── run_civicmesh.sbatch
+│   │   ├── start_peers.sh
+│   │   └── start_publishers.sh
+│   │
+│   ├── data/
+│   │   └── download_air_quality.py
+│   │
+│   └── agents/
+│       ├── documenter/
+│       ├── bug_reviewer/
+│       └── mr_reviewer/
+|
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+│
+└── runs/
+    └── .gitkeep
 
 ```
 
