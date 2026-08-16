@@ -1,0 +1,6 @@
+hostfile.txt
+
+# Archivos compilados y carpetas de caché de Python
+__pycache__/
+*.py[cod]
+*$py.class

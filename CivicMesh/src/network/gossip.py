@@ -17,6 +17,7 @@ class Gossiper:
     def membership_event(self, members):
         """Fusiona la lista recibida en el payload con el diccionario peers_view."""
 
+        now = time.time()
         for member in members:
 
             m_id = member.get("node_id")
@@ -25,6 +26,9 @@ class Gossiper:
             m_last_seen = member.get("last_seen", time.time())
 
             if m_id == self.node_id:
+                continue
+
+            if (now - m_last_seen) > self.timeout:
                 continue
 
             if m_id in self.peers_view:
@@ -37,6 +41,7 @@ class Gossiper:
                     "node_port": m_port,
                     "last_seen": m_last_seen
                 }
+                print(f"[{self.node_id}] ==|== ¡Nuevo peer descubierto!: {m_id} (Total: {len(self.peers_view)})")
 
     def random_discovery(self):
         """Selecciona hasta 'fanout' nodos al azar de la vista local."""
@@ -74,6 +79,14 @@ class Gossiper:
             
         return members
 
+    def export_payload(self):
+        """Genera el diccionario final listo para enviarse por la red"""
+
+        return {
+            "intent": "GOSSIP_MEMBERSHIP",
+            "members": self.export_membership()
+        }
+
     def purge_dead_peers(self):
         """ método para hacer el barrido periodico para encontrar nodos muertos """
 
@@ -96,36 +109,40 @@ class Gossiper:
         """Registra la presencia del nodo y descubre semillas iniciales en formato host:port"""
 
         own_addr = f"{self.node_host}:{self.node_port}"
-        own_entry = f"{own_addr}\n"
-        
-        # 1. Registrarse en el hostfile (modo append)
-        try:
-            with open(filepath, "a") as f:
-                f.write(own_entry)
-        except Exception as e:
-            print(f"Error al escribir en hostfile: {e}")
-            return
+        lines = []
 
-        # 2. Leer direcciones existentes
+        # 1. Leer el archivo primero si ya existe
         try:
             with open(filepath, "r") as f:
                 lines = [line.strip() for line in f.readlines() if line.strip()]
-            
-            # Filtrar para no auto-agregarse
-            candidates = [addr for addr in lines if addr != own_addr]
-            
-            # 3. Seleccionar hasta 2 semillas al azar
-            if candidates:
-                k = min(len(candidates), 2)
-                selected_seeds = random.sample(candidates, k)
-                
-                for addr in selected_seeds:
-                    host, port = addr.split(":")
-                    # Usamos la dirección como ID temporal en el diccionario
-                    self.peers_view[addr] = {
-                        "node_host": host,
-                        "node_port": int(port),
-                        "last_seen": time.time()
-                    }
+
+        except FileNotFoundError:
+            pass  # El archivo se creará en el paso 2 si no existe
+
         except Exception as e:
-            print(f"Error al leer hostfile: {e}")
+            print(f"[{self.node_id}] Error al leer hostfile: {e}")
+
+        # 2. Registrarse en el hostfile SOLO si no estaba inscrito previamente
+        if own_addr not in lines:
+            try:
+                with open(filepath, "a") as f:
+                    f.write(f"{own_addr}\n")
+
+            except Exception as e:
+                print(f"[{self.node_id}] Error al escribir en hostfile: {e}")
+
+        # 3. Filtrar candidatos y seleccionar hasta 2 semillas al azar
+        candidates = [addr for addr in lines if addr != own_addr]
+        if candidates:
+            k = min(len(candidates), 2)
+            selected_seeds = random.sample(candidates, k)
+            
+            for addr in selected_seeds:
+                host, port = addr.split(":")
+                self.peers_view[addr] = {
+                    "node_host": host,
+                    "node_port": int(port),
+                    "last_seen": time.time()
+                }
+
+            print(f"[{self.node_id}] ==|== Semillas cargadas desde hostfile: {selected_seeds}")
