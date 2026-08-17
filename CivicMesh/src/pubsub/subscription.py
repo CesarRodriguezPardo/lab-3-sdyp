@@ -23,6 +23,23 @@ class Subscription:
                 f"Debe ser uno de {VALID_CHANNELS}."
             )
 
+    @property
+    def topic_id(self) -> str:
+        """
+        Identificador del tópico utilizado por el protocolo de red.
+        """
+        return self.topic.id
+
+    def to_dict(self) -> dict:
+        """
+        Convierte la suscripción a una representación serializable
+        para mensajes JSON.
+        """
+        return {
+            "topic": self.topic_id,
+            "channel": self.channel,
+        }
+
 
 class SubscriptionManager:
     """
@@ -45,6 +62,7 @@ class SubscriptionManager:
 
         Si la suscripción ya existe, no se duplica.
         """
+
         subscription = Subscription(
             topic=topic,
             channel=channel,
@@ -65,6 +83,7 @@ class SubscriptionManager:
         Retorna True si existía y fue eliminada.
         Retorna False si no existía.
         """
+
         subscription = Subscription(
             topic=topic,
             channel=channel,
@@ -84,6 +103,7 @@ class SubscriptionManager:
         """
         Indica si el peer está suscrito al tópico y canal indicados.
         """
+
         subscription = Subscription(
             topic=topic,
             channel=channel,
@@ -95,12 +115,14 @@ class SubscriptionManager:
         """
         Retorna una copia de las suscripciones actuales.
         """
+
         return set(self._subscriptions)
 
     def clear(self) -> None:
         """
         Elimina todas las suscripciones.
         """
+
         self._subscriptions.clear()
 
     def subscribe_to_topic(
@@ -111,6 +133,7 @@ class SubscriptionManager:
         """
         Suscribe el peer a uno o ambos canales de un tópico.
         """
+
         for channel in channels:
             self.subscribe(topic, channel)
 
@@ -119,7 +142,29 @@ class SubscriptionManager:
         Retorna los tópicos geográficos a los que está suscrito
         el peer.
         """
+
         return {
             subscription.topic
+            for subscription in self._subscriptions
+        }
+
+    def serialized_subscriptions(self) -> set[tuple[str, str]]:
+        """
+        Retorna las suscripciones en formato adecuado
+        para compartirlas mediante el protocolo de red.
+
+        Ejemplo:
+
+        {
+            ("comuna:maipu", "objective"),
+            ("region:metropolitana", "subjective")
+        }
+        """
+
+        return {
+            (
+                subscription.topic_id,
+                subscription.channel,
+            )
             for subscription in self._subscriptions
         }

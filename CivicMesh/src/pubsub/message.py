@@ -11,6 +11,9 @@ class Message:
     dos canales definidos por el laboratorio:
         - objective
         - subjective
+    TTL controla cuántos saltos adicionales puede realizar el mensaje.
+    hop_count registra cuántos saltos ha realizado.
+    priority permite diferenciar la importancia del mensaje.
     """
 
     topic: str
@@ -50,10 +53,11 @@ class Message:
 
     def decrement_ttl(self) -> None:
         """
-        Reduce el TTL en un salto.
-        El TTL representa cuántos saltos adicionales puede realizar
-        el mensaje dentro de la malla.
+        Consume un salto del mensaje.
+        Cada vez que el mensaje es reenviado hacia otro peer,
+        el TTL disminuye en uno y hop_count aumenta en uno.
         """
+
         if self.ttl > 0:
             self.ttl -= 1
 
@@ -62,5 +66,7 @@ class Message:
     def can_forward(self) -> bool:
         """
         Indica si el mensaje todavía puede ser reenviado.
+        Un mensaje con TTL igual a cero no puede continuar
+        propagándose por la malla.
         """
         return self.ttl > 0

@@ -37,3 +37,16 @@ geography:
       - Ñuñoa
       - Maipú
       - Las Condes
+
+pubsub:
+  fanout: 3
+  ttl: 5
+
+  priority:
+    low: 1
+    normal: 2
+    high: 3
+
+gossip:
+  fanout: 2
+  timeout: 3.0
