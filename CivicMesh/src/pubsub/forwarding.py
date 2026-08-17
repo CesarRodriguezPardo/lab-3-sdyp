@@ -1,6 +1,44 @@
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional
 
 from .message import Message
+from .channel import ChannelPolicies
+
+
+# Multiplicador máximo de prioridad admitido al calcular el fanout.
+# Coincide con el nivel más alto declarado en config.yaml
+# (pubsub.priority.high = 3).
+# Existe para que una prioridad mal configurada (o maliciosa)
+# no pueda degenerar en flooding.
+DEFAULT_MAX_PRIORITY_MULTIPLIER = 3
+
+
+def _effective_fanout(
+    base_fanout: int,
+    priority: int,
+    max_priority_multiplier: int = DEFAULT_MAX_PRIORITY_MULTIPLIER,
+) -> int:
+    """
+    Calcula el fanout efectivo a partir del fanout base y la
+    prioridad del mensaje.
+
+    Política:
+
+        fanout_efectivo = base_fanout * priority
+
+    La prioridad se limita mediante max_priority_multiplier
+    para evitar que una prioridad excesiva produzca flooding.
+    """
+
+    if base_fanout <= 0:
+        return base_fanout
+
+    effective_priority = max(1, priority)
+    capped_priority = min(
+        effective_priority,
+        max_priority_multiplier,
+    )
+
+    return base_fanout * capped_priority
 
 
 def _get_peers_view(local_view: Dict[str, Any]) -> Dict[str, Any]:
@@ -47,12 +85,13 @@ def _is_subscribed(
     """
     Determina si un peer está suscrito al tópico y canal.
 
-    Las suscripciones remotas utilizan pares:
+    Se acepta:
 
         (topic_id, channel)
 
-    pero también se acepta el caso simplificado en que
-    solo se registra el topic_id (sin distinguir canal).
+    o solamente:
+
+        topic_id
     """
 
     if not isinstance(peer_info, dict):
@@ -71,7 +110,8 @@ def _is_subscribed(
     except TypeError:
         return False
 
-    # Formato simplificado: solo el topic_id, sin canal.
+    # Formato simplificado:
+    # solo se registra el topic_id.
     try:
         return topic in subscriptions
     except TypeError:
@@ -82,6 +122,7 @@ def should_forward(
     msg: Message,
     topic: str,
     local_view: Dict[str, Any],
+    channel_policies: Optional[ChannelPolicies] = None,
 ) -> bool:
     """
     Decide si un mensaje Pub/Sub debe ser reenviado.
@@ -89,21 +130,33 @@ def should_forward(
     La decisión considera:
 
     1. El tópico recibido corresponde al tópico del mensaje.
-    2. El mensaje todavía tiene TTL disponible.
-    3. El mensaje no ha sido procesado anteriormente.
-    4. Existe al menos un peer candidato.
+    2. El canal del mensaje es válido.
+    3. El mensaje todavía tiene TTL disponible.
+    4. El mensaje no ha sido procesado anteriormente.
+    5. Existe al menos un peer candidato.
+    6. Si se entrega una ChannelPolicy, el mensaje utiliza
+       la configuración correspondiente a su canal.
 
-    Esta función decide si el forwarding está permitido.
-
-    select_fanout_peers() decide posteriormente a qué peers
-    se enviará el mensaje.
+    channel_policy es opcional para mantener compatibilidad
+    con las llamadas existentes.
     """
 
     if topic != msg.topic:
         return False
 
+    if msg.channel not in {"objective", "subjective"}:
+        return False
+
     if not msg.can_forward():
         return False
+
+    # Si existe una política explícita, verificamos que el canal
+    # tenga una configuración válida.
+    if channel_policies is not None:
+        try:
+            channel_policies.get(msg.channel)
+        except ValueError:
+            return False
 
     seen_messages = _get_seen_messages(local_view)
 
@@ -123,6 +176,8 @@ def select_fanout_peers(
     local_peer_id: str,
     local_view: Dict[str, Any],
     fanout: int = 3,
+    max_priority_multiplier: int = DEFAULT_MAX_PRIORITY_MULTIPLIER,
+    channel_policies: Optional[ChannelPolicies] = None,
 ) -> List[str]:
     """
     Selecciona los peers a los que se reenviará un mensaje Pub/Sub.
@@ -134,24 +189,13 @@ def select_fanout_peers(
     3. No seleccionar al propio peer.
     4. No devolver inmediatamente el mensaje a su emisor.
     5. Priorizar peers suscritos al mismo tópico y canal.
-    6. Limitar la cantidad de destinatarios al valor de fanout.
-    7. Si no hay suficientes peers suscritos, completar el fanout
-       con otros peers disponibles.
-    8. Nunca realizar flooding.
+    6. Escalar el número de destinatarios según la prioridad.
+    7. Limitar la cantidad de destinatarios al fanout efectivo.
+    8. Si no hay suficientes peers suscritos, completar con otros.
+    9. Nunca realizar flooding.
 
-    Parameters
-    ----------
-    msg:
-        Mensaje que se desea reenviar.
-
-    local_peer_id:
-        ID del peer que realiza el forwarding.
-
-    local_view:
-        Vista local de peers.
-
-    fanout:
-        Número máximo de destinatarios.
+    channel_policies permite validar que el mensaje pertenezca a
+    uno de los dos canales configurados.
 
     Returns
     -------
@@ -159,8 +203,14 @@ def select_fanout_peers(
         IDs de los peers seleccionados.
     """
 
+    if channel_policies is not None:
+        channel_policy = channel_policies.get(msg.channel)
+        fanout = channel_policy.fanout
+
     if fanout < 0:
-        raise ValueError("fanout no puede ser negativo")
+        raise ValueError(
+            "fanout no puede ser negativo"
+        )
 
     if fanout == 0:
         return []
@@ -169,6 +219,7 @@ def select_fanout_peers(
         msg,
         msg.topic,
         local_view,
+        channel_policies=channel_policies,
     ):
         return []
 
@@ -202,7 +253,13 @@ def select_fanout_peers(
     # completar el fanout.
     candidates = subscribed_peers + other_peers
 
-    return candidates[:fanout]
+    effective_fanout = _effective_fanout(
+        base_fanout=fanout,
+        priority=msg.priority,
+        max_priority_multiplier=max_priority_multiplier,
+    )
+
+    return candidates[:effective_fanout]
 
 
 def mark_message_seen(

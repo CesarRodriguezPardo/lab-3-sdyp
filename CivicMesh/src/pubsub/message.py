@@ -7,12 +7,16 @@ from uuid import uuid4
 class Message:
     """
     Mensaje que circula por la capa Pub/Sub de CivicMesh.
-    Un mensaje pertenece a un tópico geográfico y a uno de los
-    dos canales definidos por el laboratorio:
-        - objective
-        - subjective
-    TTL controla cuántos saltos adicionales puede realizar el mensaje.
+
+    Cada mensaje pertenece a:
+        - un tópico geográfico
+        - un canal: objective o subjective
+
+    TTL controla cuántos saltos adicionales puede realizar
+    el mensaje.
+
     hop_count registra cuántos saltos ha realizado.
+
     priority permite diferenciar la importancia del mensaje.
     """
 
@@ -54,8 +58,10 @@ class Message:
     def decrement_ttl(self) -> None:
         """
         Consume un salto del mensaje.
-        Cada vez que el mensaje es reenviado hacia otro peer,
-        el TTL disminuye en uno y hop_count aumenta en uno.
+
+        Cada vez que el mensaje es reenviado hacia otro peer:
+            - TTL disminuye en uno
+            - hop_count aumenta en uno
         """
 
         if self.ttl > 0:
@@ -66,7 +72,6 @@ class Message:
     def can_forward(self) -> bool:
         """
         Indica si el mensaje todavía puede ser reenviado.
-        Un mensaje con TTL igual a cero no puede continuar
-        propagándose por la malla.
         """
+
         return self.ttl > 0
