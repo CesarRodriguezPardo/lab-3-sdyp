@@ -39,11 +39,6 @@ geography:
       - Las Condes
 
 pubsub:
-  priority:
-    low: 1
-    normal: 2
-    high: 3
-
   channels:
     objective:
       ttl: 5
@@ -57,4 +52,4 @@ pubsub:
 
 gossip:
   fanout: 2
-  timeout: 3.0 
+  timeout: 3.0

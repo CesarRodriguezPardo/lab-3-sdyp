@@ -5,8 +5,8 @@ from .channel import ChannelPolicies
 
 
 # Multiplicador máximo de prioridad admitido al calcular el fanout.
-# Coincide con el nivel más alto declarado en config.yaml
-# (pubsub.priority.high = 3).
+# Coincide con la prioridad más alta declarada entre los canales
+# de config.yaml (pubsub.channels.objective.priority = 3).
 # Existe para que una prioridad mal configurada (o maliciosa)
 # no pueda degenerar en flooding.
 DEFAULT_MAX_PRIORITY_MULTIPLIER = 3
