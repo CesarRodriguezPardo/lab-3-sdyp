@@ -15,9 +15,23 @@ class Gossiper:
         self.peers_view = {}
 
     def membership_event(self, members):
-        """Fusiona la lista recibida en el payload con el diccionario peers_view."""
+        """
+        Fusiona la lista recibida en el payload con el diccionario
+        peers_view.
+
+        Returns
+        -------
+        list
+            IDs de los peers que NO se conocían previamente
+            (recién descubiertos en esta llamada). Permite que
+            capas superiores (p. ej. Pub/Sub) reaccionen a nuevos
+            miembros de la malla — por ejemplo, reanunciándoles
+            las suscripciones locales existentes.
+        """
 
         now = time.time()
+        new_peer_ids = []
+
         for member in members:
 
             m_id = member.get("node_id")
@@ -41,7 +55,10 @@ class Gossiper:
                     "node_port": m_port,
                     "last_seen": m_last_seen
                 }
+                new_peer_ids.append(m_id)
                 print(f"[{self.node_id}] ==|== ¡Nuevo peer descubierto!: {m_id} (Total: {len(self.peers_view)})")
+
+        return new_peer_ids
 
     def random_discovery(self):
         """Selecciona hasta 'fanout' nodos al azar de la vista local."""
