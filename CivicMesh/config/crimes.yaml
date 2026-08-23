@@ -1,0 +1,21 @@
+# config/crimes.yaml
+
+domain: "crimes"
+
+# Semilla global para reproducibilidad
+seed: 321
+
+# Tasas lambda (λ) por intervalo de simulación (Δt)
+# Representan el promedio esperado de delitos de cada tipo
+lambdas:
+  robo: 0.5
+  hurto: 1.2
+  vandalismo: 0.8
+
+# Parámetros del modelo estocástico para el canal subjetivo (Dominio A)
+perception:
+  beta_0: -1.0         # Sesgo base
+  beta_1: 0.4          # Peso de la memoria local (EMA)
+  beta_2: 0.8          # Peso de los rumores (gossip)
+  sigma_epsilon: 0.1   # Desviación estándar del ruido
+  alpha: 0.8           # Factor de decaimiento de la memoria EMA

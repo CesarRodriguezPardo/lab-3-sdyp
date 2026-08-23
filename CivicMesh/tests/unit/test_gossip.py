@@ -1,6 +1,6 @@
 import time
 import pytest
-from CivicMesh.src.network.gossip import Gossiper
+from src.network.gossip import Gossiper
 
 
 @pytest.fixture
