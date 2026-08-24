@@ -58,9 +58,8 @@ class SubscriptionManager:
         channel: str,
     ) -> Subscription:
         """
-        Suscribe el peer a un tópico y canal.
-
-        Si la suscripción ya existe, no se duplica.
+        Suscribe el peer a un tópico y canal. Si la suscripción ya
+        existe, no se duplica.
         """
 
         subscription = Subscription(
@@ -150,8 +149,8 @@ class SubscriptionManager:
 
     def serialized_subscriptions(self) -> set[tuple[str, str]]:
         """
-        Retorna las suscripciones en formato adecuado
-        para compartirlas mediante el protocolo de red.
+        Retorna las suscripciones para compartirlas
+        mediante el protocolo de red.
 
         Ejemplo:
 
