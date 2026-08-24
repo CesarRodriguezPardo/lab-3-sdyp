@@ -49,10 +49,9 @@ def parse_args():
 async def _command_loop(node: Peer) -> None:
     """
     Loop interactivo simple para probar la capa Pub/Sub desde la
-    terminal — la contraparte de la demo de gossip del README,
-    pero para publish()/subscribe().
+    terminal.
 
-    Comandos soportados:
+    Comandos:
         SUBSCRIBE <nivel>:<nombre> <canal>
             Ej: SUBSCRIBE comuna:Maipu objective
 
@@ -72,20 +71,6 @@ async def _command_loop(node: Peer) -> None:
         f"(Ctrl+D o Ctrl+C para salir)"
     )
 
-    # IMPORTANTE: no usar asyncio.to_thread(input, ...) aquí.
-    #
-    # input() bloquea un hilo real del sistema operativo, no una
-    # corrutina. Cuando se cancela la tarea (ej. Ctrl+C), asyncio
-    # deja de esperar el resultado, pero el hilo en sí sigue
-    # bloqueado indefinidamente en input() — Python no puede
-    # forzar su cierre desde afuera. Al salir, asyncio.run()
-    # intenta esperar (hasta 300s) a que ese hilo termine antes
-    # de cerrar el proceso, lo que produce el hang silencioso /
-    # "RuntimeWarning: executor did not finish joining".
-    #
-    # Leer stdin con las primitivas nativas de asyncio
-    # (connect_read_pipe + StreamReader) sí se integra con el
-    # event loop y responde correctamente a la cancelación.
     loop = asyncio.get_event_loop()
     reader = asyncio.StreamReader()
     protocol = asyncio.StreamReaderProtocol(reader)

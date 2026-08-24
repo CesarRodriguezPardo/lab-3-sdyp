@@ -4,13 +4,15 @@ from .message import Message
 from .channel import ChannelPolicies
 
 
-# Multiplicador máximo de prioridad admitido al calcular el fanout.
-# Coincide con la prioridad más alta declarada entre los canales
-# de config.yaml (pubsub.channels.objective.priority = 3).
-# Existe para que una prioridad mal configurada (o maliciosa)
-# no pueda degenerar en flooding.
+# Multiplicador máximo de prioridad admitido al calcular el fanout,
+# usado solo como fallback cuando select_fanout_peers() no recibe
+# channel_policies
+#
+# Cuando sí hay channel_policies, el techo real es channel_policy.priority,
+# la prioridad declarada para ese canal en config.yaml.
+# Así, si cambia pubsub.channels.<canal>.priority, el techo de
+# escalación de ese canal cambia con él automáticamente.
 DEFAULT_MAX_PRIORITY_MULTIPLIER = 3
-
 
 def _effective_fanout(
     base_fanout: int,
@@ -89,7 +91,7 @@ def _is_subscribed(
 
         (topic_id, channel)
 
-    o solamente:
+    o:
 
         topic_id
     """
@@ -195,7 +197,10 @@ def select_fanout_peers(
     9. Nunca realizar flooding.
 
     channel_policies permite validar que el mensaje pertenezca a
-    uno de los dos canales configurados.
+    uno de los dos canales configurados. Cuando se entrega,
+    también reemplaza max_priority_multiplier por el propio
+    channel_policy.priority del canal del mensaje, así el techo
+    de escalación de cada canal queda se basa en su configuración.
 
     Returns
     -------
@@ -206,6 +211,7 @@ def select_fanout_peers(
     if channel_policies is not None:
         channel_policy = channel_policies.get(msg.channel)
         fanout = channel_policy.fanout
+        max_priority_multiplier = channel_policy.priority
 
     if fanout < 0:
         raise ValueError(
@@ -249,7 +255,7 @@ def select_fanout_peers(
             other_peers.append(peer_id)
 
     # Primero peers interesados.
-    # Después peers restantes si todavía necesitamos
+    # Después peers restantes si todavía se necesita
     # completar el fanout.
     candidates = subscribed_peers + other_peers
 
