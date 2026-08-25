@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  peer-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: civicmesh-peer-1
+    hostname: peer-1
+    command: ["--host", "peer-1", "--port", "8001", "--hostfile", "/app/runs/hostfile.txt", "--fanout", "2", "--timeout", "6.0"]
+    volumes:
+      - shared-runs:/app/runs
+    networks:
+      - civicmesh-net
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
+  peer-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: civicmesh-peer-2
+    hostname: peer-2
+    command: ["--host", "peer-2", "--port", "8002", "--hostfile", "/app/runs/hostfile.txt", "--fanout", "2", "--timeout", "6.0"]
+    volumes:
+      - shared-runs:/app/runs
+    networks:
+      - civicmesh-net
+    ports:
+      - "8002:8002"
+    depends_on:
+      - peer-1
+    restart: unless-stopped
+
+  peer-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: civicmesh-peer-3
+    hostname: peer-3
+    command: ["--host", "peer-3", "--port", "8003", "--hostfile", "/app/runs/hostfile.txt", "--fanout", "2", "--timeout", "6.0"]
+    volumes:
+      - shared-runs:/app/runs
+    networks:
+      - civicmesh-net
+    ports:
+      - "8003:8003"
+    depends_on:
+      - peer-1
+    restart: unless-stopped
+
+  publisher-air:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: civicmesh-publisher-air
+    hostname: publisher-air
+    entrypoint: ["python", "scripts/run_publisher.py"]
+    command: ["--domain", "air_quality", "--comuna", "Las Condes", "--host", "publisher-air", "--port", "9001", "--hostfile", "/app/runs/hostfile.txt", "--interval", "2.0"]
+    volumes:
+      - shared-runs:/app/runs
+    networks:
+      - civicmesh-net
+    depends_on:
+      - peer-1
+      - peer-2
+      - peer-3
+    restart: unless-stopped
+
+networks:
+  civicmesh-net:
+    driver: bridge
+
+volumes:
+  shared-runs:
