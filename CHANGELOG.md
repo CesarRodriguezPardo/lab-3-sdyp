@@ -31,4 +31,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- _(pendiente según desarrollo)_
+- Corrección de configuración `sys.path` en `conftest.py` para compatibilidad de importación en suite de tests.
+- Corrección de sintaxis en `bug_reviewer.py` y refinamiento de reglas de clasificación en `mr_reviewer.py`.
