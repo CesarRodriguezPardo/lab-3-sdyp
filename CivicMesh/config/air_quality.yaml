@@ -1,0 +1,13 @@
+# config/air_quality.yaml
+
+domain: "air_quality"
+
+# Configuración general para garantizar la reproducibilidad
+seed: 321
+
+# Parámetros del modelo estocástico para el canal subjetivo (Dominio B)
+perception:
+  alpha: 0.85          # Factor EMA: Valores altos significan un olvido más lento
+  gamma: 0.6           # Peso del sesgo por el pico retenido en la memoria
+  delta: 0.3           # Peso del arrastre provocado por el rumor (gossip)
+  sigma_epsilon: 2.0   # Desviación estándar para el ruido gaussiano
