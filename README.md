@@ -10,13 +10,13 @@ Framework P2P de Publish/Subscribe para monitoreo ciudadano distribuido basado e
 
 ## 1. Equipo y Roles
 
-| Nombre | Rol | Responsabilidades |
-| :----- | :-- | :---------------- |
-| _(nombre)_ | 1 — Capa de Red / Gossip | Membresía, descubrimiento, tolerancia a fallos, vista parcial. |
-| _(nombre)_ | 2 — Capa Pub/Sub | Tópicos geográficos, suscripciones, `should_forward`, fanout, canales objetivo/subjetivo. |
-| _(nombre)_ | 3 — Datos | Ingesta/cache SINCA/Open-Meteo, replay determinista, generadores Poisson y modelos de percepción. |
-| _(nombre)_ | 4 — Analítica y Estadística | Métricas de convergencia y divergencia, experimentos de fallo/partición, frontend de estadísticas. |
-| **César Rodríguez** | 5 — CI/CD, Git y Agentes | Pipeline CI verde con tests, Dockerfile y docker-compose, scripts Slurm/Shared FS, 3 agentes de IA y README. |
+| Nombre                | Rol                         | Responsabilidades                                                                                            |
+| :-------------------- | :-------------------------- | :----------------------------------------------------------------------------------------------------------- |
+| _(nombre)_            | 1 — Capa de Red / Gossip    | Membresía, descubrimiento, tolerancia a fallos, vista parcial.                                               |
+| _(nombre)_            | 2 — Capa Pub/Sub            | Tópicos geográficos, suscripciones, `should_forward`, fanout, canales objetivo/subjetivo.                    |
+| _(nombre)_            | 3 — Datos                   | Ingesta/cache SINCA/Open-Meteo, replay determinista, generadores Poisson y modelos de percepción.            |
+| **Sebastián Cassone** | 4 — Analítica y Estadística | Métricas de convergencia y divergencia, experimentos de fallo/partición, frontend de estadísticas.           |
+| **César Rodríguez**   | 5 — CI/CD, Git y Agentes    | Pipeline CI verde con tests, Dockerfile y docker-compose, scripts Slurm/Shared FS, 3 agentes de IA y README. |
 
 ---
 
@@ -34,11 +34,11 @@ Framework P2P de Publish/Subscribe para monitoreo ciudadano distribuido basado e
 
 Tres agentes automatizan tareas de mantenimiento, revisión de bugs y control de calidad en PRs utilizando **Gemini 2.5 Flash** (scripts en [`.github/agents/`](.github/agents/), workflows en [`.github/workflows/`](.github/workflows/)):
 
-| Agente | Herramienta | Frecuencia / Trigger | Criterio mecánico (Auto-fix / Mergeable) | Criterio humano (Escalamiento a Issue) |
-| :--- | :--- | :--- | :--- | :--- |
-| **Documentador** | Python + Gemini 2.5 Flash | Semanal (lunes 09:00 UTC) y push a `main` | Typos, enlaces vacíos o secciones faltantes en README/CHANGELOG → abre PR `fix/docs/*` (`agent:auto-fix`). | Decisiones arquitectónicas o documentación no estructurada → abre issue `[agent:docs] Requiere intervención humana`. |
-| **Revisor de bugs** | Python + Gemini 2.5 Flash | Diario (cron 03:00 UTC) | Sockets sin timeout, uso de `random` sin seed fija, `except:` desnudos, `subprocess` sin timeout → issue con parche. | Modificaciones en semántica del protocolo o lógica de enrutamiento → issue categorizado para humano. |
-| **Revisor de MRs** | Python + Gemini 2.5 Flash | Post-CI (`workflow_run` completado) | Solo docs, tests o config modificados con CI verde e issue vinculado → veredicto *"Mecánico y mergeable tras aprobación humana"*. | Cambios en código de protocolo (`src/network/`, `src/pubsub/`, etc.) o CI fallando → veredicto *"Requiere revisión humana"*. |
+| Agente              | Herramienta               | Frecuencia / Trigger                      | Criterio mecánico (Auto-fix / Mergeable)                                                                                          | Criterio humano (Escalamiento a Issue)                                                                                       |
+| :------------------ | :------------------------ | :---------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------- |
+| **Documentador**    | Python + Gemini 2.5 Flash | Semanal (lunes 09:00 UTC) y push a `main` | Typos, enlaces vacíos o secciones faltantes en README/CHANGELOG → abre PR `fix/docs/*` (`agent:auto-fix`).                        | Decisiones arquitectónicas o documentación no estructurada → abre issue `[agent:docs] Requiere intervención humana`.         |
+| **Revisor de bugs** | Python + Gemini 2.5 Flash | Diario (cron 03:00 UTC)                   | Sockets sin timeout, uso de `random` sin seed fija, `except:` desnudos, `subprocess` sin timeout → issue con parche.              | Modificaciones en semántica del protocolo o lógica de enrutamiento → issue categorizado para humano.                         |
+| **Revisor de MRs**  | Python + Gemini 2.5 Flash | Post-CI (`workflow_run` completado)       | Solo docs, tests o config modificados con CI verde e issue vinculado → veredicto _"Mecánico y mergeable tras aprobación humana"_. | Cambios en código de protocolo (`src/network/`, `src/pubsub/`, etc.) o CI fallando → veredicto _"Requiere revisión humana"_. |
 
 > **Gobernanza:** Los agentes nunca realizan merge automático a `main`. Tienen un límite de seguridad de máximo 5 issues automáticos por agente por semana.
 
@@ -47,8 +47,9 @@ Tres agentes automatizan tareas de mantenimiento, revisión de bugs y control de
 ## 4. Requisitos e Instalación Local
 
 ### Requisitos Previos
-* Python 3.10 o superior
-* `pip` y `python3-venv`
+
+- Python 3.10 o superior
+- `pip` y `python3-venv`
 
 ### Configuración del Entorno
 
@@ -64,23 +65,26 @@ pip install -r requirements.txt
 ### Ejecución de Nodos
 
 #### 1. Iniciar un Nodo Individual
+
 ```bash
 python3 -m CivicMesh.src.main --port 8000 --hostfile hostfile.txt
 ```
 
 #### 2. Parámetros Configurables
 
-| Parámetro | Tipo | Defecto | Descripción |
-| :--- | :--- | :--- | :--- |
-| `--host` | `str` | `127.0.0.1` | Dirección IP donde escuchará el servidor del nodo. |
-| `--port` | `int` | *Requerido* | Puerto TCP local para el nodo. |
-| `--hostfile` | `str` | `hostfile.txt` | Ruta al archivo con direcciones de nodos semilla conocidos. |
-| `--fanout` | `int` | `2` | Cantidad de peers a contactar por ciclo de gossip (membresía). |
-| `--timeout` | `float` | `6.0` | Tiempo límite en segundos para declarar un peer inactivo como caído. |
-| `--interactive` | `flag` | `False` | Habilita consola interactiva para comandos Pub/Sub manuales. |
+| Parámetro       | Tipo    | Defecto        | Descripción                                                          |
+| :-------------- | :------ | :------------- | :------------------------------------------------------------------- |
+| `--host`        | `str`   | `127.0.0.1`    | Dirección IP donde escuchará el servidor del nodo.                   |
+| `--port`        | `int`   | _Requerido_    | Puerto TCP local para el nodo.                                       |
+| `--hostfile`    | `str`   | `hostfile.txt` | Ruta al archivo con direcciones de nodos semilla conocidos.          |
+| `--fanout`      | `int`   | `2`            | Cantidad de peers a contactar por ciclo de gossip (membresía).       |
+| `--timeout`     | `float` | `6.0`          | Tiempo límite en segundos para declarar un peer inactivo como caído. |
+| `--interactive` | `flag`  | `False`        | Habilita consola interactiva para comandos Pub/Sub manuales.         |
 
 #### 3. Probar la Capa Pub/Sub (Modo Interactivo)
+
 En terminales separadas:
+
 ```bash
 # Terminal 1 (Nodo A)
 python3 -m CivicMesh.src.main --port 8000 --hostfile hostfile.txt --interactive
@@ -90,6 +94,7 @@ python3 -m CivicMesh.src.main --port 8000 --hostfile hostfile.txt --interactive
 python3 -m CivicMesh.src.main --port 8001 --hostfile hostfile.txt --interactive
 > PUBLISH comuna:maipu objective {"pm2_5": 38.5}
 ```
+
 En la Terminal 1, ejecuta `INBOX` para verificar la recepción del mensaje propagado por la malla.
 
 ---
@@ -118,7 +123,9 @@ sbatch scripts/slurm/civicmesh.sbatch
 ```
 
 ### Convención de Shared FS
+
 Todas las corridas generan sus artefactos bajo la convención `$CIVICMESH_RUNS/<run_id>/`:
+
 ```text
 $CIVICMESH_RUNS/<run_id>/
 ├── hostfile.txt        # Direcciones host:port registradas por peers
@@ -134,6 +141,7 @@ $CIVICMESH_RUNS/<run_id>/
 El frontend visualiza el estado por tópico y canal, la convergencia del canal objetivo y la brecha percepción–realidad del canal subjetivo leyendo directamente desde `$CIVICMESH_RUNS/<run_id>/metrics/`.
 
 ### Acceso a la UI
+
 - **Local / Docker:** Abrir navegador en `http://localhost:8501`.
 - **Clúster DIINF (vía Túnel SSH):**
   ```bash
@@ -160,11 +168,13 @@ pytest -q
 ## 9. Diseño Técnico de Protocolos
 
 ### Protocolo Gossip y Membresía (`Gossiper`)
+
 - **Transporte y Formato:** Mensajes estructurados JSON sobre TCP con campos `intent`, `members` o `payload`.
 - **Gestión de Estado (`peers_view`):** Tabla hash en memoria $O(1)$ indexada por `node_id` (`host:port`). Descarta zombis con marcas `last_seen` antiguas y purga periódicamente nodos inactivos (`ahora - last_seen > timeout`).
 - **Descubrimiento y Anti-Entropy:** `bootstrap_from_file()` registra en `hostfile.txt` y contacta hasta 2 semillas; `random_discovery()` selecciona aleatoriamente `fanout` vecinos en cada ronda.
 
 ### Capa Pub/Sub Geográfica (`Peer` & `forwarding.py`)
+
 - **Tópicos Geográficos (`GeographicTopic`):** Normalizados a identificadores snake_case (ej. `comuna:las_condes`, `region:metropolitana`).
 - **Canales (`objective` vs `subjective`):**
   - Canal `objective`: Datos cuantitativos/sensores. Mayor TTL y prioridad para máxima cobertura.
