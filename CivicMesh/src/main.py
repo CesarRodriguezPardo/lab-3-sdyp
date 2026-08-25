@@ -3,12 +3,15 @@ import asyncio
 import json
 import os
 import sys
+import yaml
+from pathlib import Path
 
 # Permite ejecutar el script directamente desde la raíz del proyecto
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from CivicMesh.src.network.peer import Peer
 from CivicMesh.src.pubsub.topic import GeographicTopic, TopicLevel
+from CivicMesh.src.pubsub.channel import load_channel_policies
 
 
 def parse_args():
@@ -33,6 +36,36 @@ def parse_args():
         help="Timeout para declarar nodo muerto en segundos (recomendado >= 6.0)",
     )
     parser.add_argument(
+        "--config",
+        type=str,
+        default="",
+        help="Ruta al archivo config.yaml",
+    )
+    parser.add_argument(
+        "--metrics-enabled",
+        action="store_true",
+        default=True,
+        help="Habilitar generación de métricas JSONL",
+    )
+    parser.add_argument(
+        "--metrics-interval",
+        type=float,
+        default=5.0,
+        help="Intervalo en segundos entre volcados de métricas",
+    )
+    parser.add_argument(
+        "--metrics-dominio",
+        type=str,
+        default="unknown",
+        help="Dominio asociado (A, B, unknown)",
+    )
+    parser.add_argument(
+        "--run-id",
+        type=str,
+        default="",
+        help="ID de la corrida (override CIVICMESH_RUN_ID)",
+    )
+    parser.add_argument(
         "--interactive",
         action="store_true",
         help=(
@@ -44,6 +77,14 @@ def parse_args():
         ),
     )
     return parser.parse_args()
+
+
+def load_config(config_path: str) -> dict:
+    if not config_path:
+        project_root = Path(__file__).resolve().parents[2]
+        config_path = str(project_root / "config" / "config.yaml")
+    with open(config_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
 
 
 async def _command_loop(node: Peer) -> None:
@@ -144,13 +185,41 @@ async def _command_loop(node: Peer) -> None:
 
 async def main():
     args = parse_args()
+    config = load_config(args.config)
+
+    channel_policies = load_channel_policies(args.config) if args.config else load_channel_policies()
+
+    metrics_config = config.get("metrics", {})
+    metrics_enabled = args.metrics_enabled and metrics_config.get("enabled", True)
+    metrics_interval = metrics_config.get("interval_dt", args.metrics_interval)
+    metrics_flush_interval = metrics_config.get("flush_interval", 3)
+    metrics_output_dir = metrics_config.get("output_dir", None)
+    metrics_run_id = args.run_id or os.environ.get("CIVICMESH_RUN_ID") or ""
+
     node = Peer(
         host=args.host,
         port=args.port,
         hostfile=args.hostfile,
         fanout=args.fanout,
         timeout=args.timeout,
+        channel_policies=channel_policies,
+        metrics_enabled=metrics_enabled,
+        metrics_interval=metrics_interval,
+        metrics_run_id=metrics_run_id or None,
+        metrics_output_dir=metrics_output_dir,
+        metrics_flush_interval=metrics_flush_interval,
+        metrics_dominio=args.metrics_dominio,
     )
+
+    # Auto-suscribir a todos los tópicos configurados para métricas de convergencia
+    if not args.interactive and metrics_enabled:
+        geography = config.get("geography", {})
+        topics = geography.get("topics", [])
+        for topic_name in topics:
+            topic = GeographicTopic(TopicLevel.COMUNA, topic_name)
+            await node.subscribe(topic, "objective")
+            await node.subscribe(topic, "subjective")
+            print(f"[{node.gossiper.node_id}] Auto-suscrito a {topic.id}/objective y {topic.id}/subjective")
 
     if not args.interactive:
         # Comportamiento original: nodo silencioso, solo gossip.

@@ -7,9 +7,12 @@ services:
       dockerfile: Dockerfile
     container_name: civicmesh-peer-1
     hostname: peer-1
-    command: ["--host", "peer-1", "--port", "8001", "--hostfile", "/app/runs/hostfile.txt", "--fanout", "2", "--timeout", "6.0"]
+    command: ["--host", "peer-1", "--port", "8001", "--hostfile", "/app/runs/hostfile.txt", "--fanout", "2", "--timeout", "6.0", "--config", "/app/CivicMesh/config/config.yaml", "--metrics-enabled", "--metrics-dominio", "unknown"]
+    environment:
+      - CIVICMESH_RUNS=/app/runs
+      - CIVICMESH_RUN_ID=local-test
     volumes:
-      - shared-runs:/app/runs
+      - ./runs:/app/runs
     networks:
       - civicmesh-net
     ports:
@@ -22,9 +25,12 @@ services:
       dockerfile: Dockerfile
     container_name: civicmesh-peer-2
     hostname: peer-2
-    command: ["--host", "peer-2", "--port", "8002", "--hostfile", "/app/runs/hostfile.txt", "--fanout", "2", "--timeout", "6.0"]
+    command: ["--host", "peer-2", "--port", "8002", "--hostfile", "/app/runs/hostfile.txt", "--fanout", "2", "--timeout", "6.0", "--config", "/app/CivicMesh/config/config.yaml", "--metrics-enabled", "--metrics-dominio", "unknown"]
+    environment:
+      - CIVICMESH_RUNS=/app/runs
+      - CIVICMESH_RUN_ID=local-test
     volumes:
-      - shared-runs:/app/runs
+      - ./runs:/app/runs
     networks:
       - civicmesh-net
     ports:
@@ -39,9 +45,12 @@ services:
       dockerfile: Dockerfile
     container_name: civicmesh-peer-3
     hostname: peer-3
-    command: ["--host", "peer-3", "--port", "8003", "--hostfile", "/app/runs/hostfile.txt", "--fanout", "2", "--timeout", "6.0"]
+    command: ["--host", "peer-3", "--port", "8003", "--hostfile", "/app/runs/hostfile.txt", "--fanout", "2", "--timeout", "6.0", "--config", "/app/CivicMesh/config/config.yaml", "--metrics-enabled", "--metrics-dominio", "unknown"]
+    environment:
+      - CIVICMESH_RUNS=/app/runs
+      - CIVICMESH_RUN_ID=local-test
     volumes:
-      - shared-runs:/app/runs
+      - ./runs:/app/runs
     networks:
       - civicmesh-net
     ports:
@@ -57,11 +66,57 @@ services:
     container_name: civicmesh-publisher-air
     hostname: publisher-air
     entrypoint: ["python", "scripts/run_publisher.py"]
-    command: ["--domain", "air_quality", "--comuna", "Las Condes", "--host", "publisher-air", "--port", "9001", "--hostfile", "/app/runs/hostfile.txt", "--interval", "2.0"]
+    command: ["--domain", "air_quality", "--comuna", "Las Condes", "--host", "publisher-air", "--port", "9001", "--hostfile", "/app/runs/hostfile.txt", "--interval", "2.0", "--config", "/app/CivicMesh/config/config.yaml", "--metrics-enabled"]
+    environment:
+      - CIVICMESH_RUNS=/app/runs
+      - CIVICMESH_RUN_ID=local-test
     volumes:
-      - shared-runs:/app/runs
+      - ./runs:/app/runs
     networks:
       - civicmesh-net
+    depends_on:
+      - peer-1
+      - peer-2
+      - peer-3
+    restart: unless-stopped
+
+  publisher-crimes:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: civicmesh-publisher-crimes
+    hostname: publisher-crimes
+    entrypoint: ["python", "scripts/run_publisher.py"]
+    command: ["--domain", "crimes", "--comuna", "Santiago", "--host", "publisher-crimes", "--port", "9002", "--hostfile", "/app/runs/hostfile.txt", "--interval", "2.0", "--config", "/app/CivicMesh/config/config.yaml", "--metrics-enabled"]
+    environment:
+      - CIVICMESH_RUNS=/app/runs
+      - CIVICMESH_RUN_ID=local-test
+    volumes:
+      - ./runs:/app/runs
+    networks:
+      - civicmesh-net
+    depends_on:
+      - peer-1
+      - peer-2
+      - peer-3
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: civicmesh-frontend
+    hostname: frontend
+    entrypoint: ["streamlit", "run", "frontend/app.py", "--"]
+    command: ["--metrics-dir", "/app/runs/local-test/metrics"]
+    environment:
+      - CIVICMESH_RUNS=/app/runs
+    volumes:
+      - ./runs:/app/runs
+    networks:
+      - civicmesh-net
+    ports:
+      - "8501:8501"
     depends_on:
       - peer-1
       - peer-2
@@ -72,5 +127,4 @@ networks:
   civicmesh-net:
     driver: bridge
 
-volumes:
-  shared-runs:
+# No named volumes - using bind mount ./runs:/app/runs

@@ -9,6 +9,7 @@ import argparse
 import asyncio
 import os
 import sys
+import time
 import yaml
 from pathlib import Path
 
@@ -24,12 +25,16 @@ try:
     from CivicMesh.src.domains.air_quality.replay import AirQualityPublisher
     from CivicMesh.src.domains.crimes.generator import generar_delitos
     from CivicMesh.src.domains.crimes.perception import calcular_inseguridad
+    from CivicMesh.src.domains.air_quality.perception import calcular_percepcion_aire
+    from CivicMesh.src.aggregation.metrics import get_metrics_writer
 except ModuleNotFoundError:
     from src.network.peer import Peer
     from src.pubsub.topic import GeographicTopic, TopicLevel
     from src.domains.air_quality.replay import AirQualityPublisher
     from src.domains.crimes.generator import generar_delitos
     from src.domains.crimes.perception import calcular_inseguridad
+    from src.domains.air_quality.perception import calcular_percepcion_aire
+    from src.aggregation.metrics import get_metrics_writer
 
 
 def parse_args():
@@ -47,10 +52,16 @@ def parse_args():
                         help="Ruta al archivo cache JSONL para air_quality")
     parser.add_argument("--interval", type=float, default=2.0,
                         help="Intervalo en segundos entre publicaciones")
+    parser.add_argument("--metrics-enabled", action="store_true", default=True,
+                        help="Habilitar generación de métricas de brecha")
+    parser.add_argument("--metrics-interval", type=float, default=5.0,
+                        help="Intervalo en segundos entre volcados de métricas")
+    parser.add_argument("--run-id", type=str, default="",
+                        help="ID de la corrida (override CIVICMESH_RUN_ID)")
     return parser.parse_args()
 
 
-async def run_crimes_publisher(peer: Peer, comuna: str, config: dict, interval: float):
+async def run_crimes_publisher(peer: Peer, comuna: str, config: dict, interval: float, metrics_writer=None):
     print(f"[{peer.gossiper.node_id}] Iniciando publicador de Delitos para: {comuna}")
     topic = GeographicTopic(level=TopicLevel.COMUNA, name=comuna)
     await peer.subscribe(topic=topic, channel="subjective")
@@ -88,7 +99,19 @@ async def run_crimes_publisher(peer: Peer, comuna: str, config: dict, interval: 
             timestamp=timestamp_str,
         )
 
-        # 4. Publicar en canal subjetivo
+        # 4. Escribir métrica de brecha (G_c = r_c, P_c = p_c, M_c = m_c)
+        if metrics_writer:
+            metrics_writer.write_gap(
+                peer_id=peer.gossiper.node_id,
+                dominio="A",
+                comuna=comuna,
+                timestamp=time.time(),
+                G_c=float(r_c),
+                P_c=p_c,
+                M_c=m_c,
+            )
+
+        # 5. Publicar en canal subjetivo
         payload_subjetivo = {
             "tipo": "sensacion_inseguridad",
             "indice_inseguridad": round(p_c, 4),
@@ -119,11 +142,35 @@ async def main():
         with open(config_path, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f) or {}
 
+    metrics_config = config.get("metrics", {})
+    metrics_enabled = args.metrics_enabled and metrics_config.get("enabled", True)
+    metrics_interval = metrics_config.get("interval_dt", args.metrics_interval)
+    metrics_flush_interval = metrics_config.get("flush_interval", 3)
+    metrics_output_dir = metrics_config.get("output_dir", None)
+    metrics_run_id = args.run_id or os.environ.get("CIVICMESH_RUN_ID") or ""
+
+    dominio = "A" if args.domain == "crimes" else "B"
+
     peer = Peer(
         host=args.host,
         port=args.port,
         hostfile=args.hostfile,
+        metrics_enabled=metrics_enabled,
+        metrics_interval=metrics_interval,
+        metrics_run_id=metrics_run_id or None,
+        metrics_output_dir=metrics_output_dir,
+        metrics_flush_interval=metrics_flush_interval,
+        metrics_dominio=dominio,
     )
+
+    metrics_writer = None
+    if metrics_enabled:
+        metrics_writer = get_metrics_writer(
+            run_id=metrics_run_id or None,
+            output_dir=metrics_output_dir,
+            flush_interval=metrics_flush_interval,
+        )
+
     peer_task = asyncio.create_task(peer.start())
 
     try:
@@ -135,12 +182,101 @@ async def main():
                 pubsub_client=peer,
                 config=config.get("perception", config),
             )
-            await publisher.run(delta_t_segundos=args.interval)
+            # Wrap publisher.run to write gap metrics
+            await run_air_quality_with_metrics(publisher, args.comuna, args.interval, metrics_writer)
         else:
-            await run_crimes_publisher(peer, args.comuna, config, args.interval)
+            await run_crimes_publisher(peer, args.comuna, config, args.interval, metrics_writer)
     finally:
         peer_task.cancel()
         await asyncio.gather(peer_task, return_exceptions=True)
+        if metrics_writer:
+            metrics_writer.flush_all()
+            metrics_writer.close()
+
+
+async def run_air_quality_with_metrics(publisher, comuna: str, interval: float, metrics_writer):
+    """Wrapper que escribe métricas de brecha para air_quality."""
+    import json
+    import logging
+    from CivicMesh.src.pubsub.topic import GeographicTopic, TopicLevel
+
+    logging.info(f"Iniciando publicador (replay) para la comuna: {comuna}")
+
+    topico_geo = GeographicTopic(level=TopicLevel.COMUNA, name=comuna)
+
+    # ¡NUEVO!: Nos suscribimos al canal subjetivo para recibir los rumores por la red
+    await publisher.pubsub_client.subscribe(topic=topico_geo, channel='subjective')
+
+    for registro in publisher.dataset:
+        timestamp = registro.get("timestamp")
+        v_c = registro.get("comunas", {}).get(comuna)
+
+        if v_c is None:
+            continue
+
+        # 1. Publicar objetivo
+        mensaje_objetivo = {
+            "tipo": "medicion_pm10",
+            "valor": v_c,
+            "timestamp": timestamp
+        }
+        await publisher.pubsub_client.publish(
+            topic=topico_geo,
+            channel='objective',
+            payload=mensaje_objetivo
+        )
+
+        # 2. Leer rumores desde el buzón local (local_inbox) del peer
+        rumores_q = []
+        mensajes_procesados = []
+
+        for msg in publisher.pubsub_client.local_inbox:
+            # Validar que el mensaje sea del canal y tópico correctos
+            if msg.channel == 'subjective' and msg.topic == topico_geo.id:
+                # Extraer el valor del payload enviado por otro nodo
+                if isinstance(msg.payload, dict) and "valor" in msg.payload:
+                    rumores_q.append(msg.payload["valor"])
+                mensajes_procesados.append(msg)
+
+        # Limpiar el buzón para el siguiente ciclo
+        for msg in mensajes_procesados:
+            publisher.pubsub_client.local_inbox.remove(msg)
+
+        # 3. Utilizar tu lógica de percepción real
+        p_c, publisher.m_c = calcular_percepcion_aire(
+            v_c=v_c,
+            m_c_prev=publisher.m_c,
+            rumores_q=rumores_q,
+            config=publisher.config,
+            comuna=comuna,
+            timestamp=timestamp
+        )
+
+        # 4. Escribir métrica de brecha
+        if metrics_writer:
+            metrics_writer.write_gap(
+                peer_id=publisher.pubsub_client.gossiper.node_id,
+                dominio="B",
+                comuna=comuna,
+                timestamp=time.time(),
+                G_c=v_c,
+                P_c=p_c,
+                M_c=publisher.m_c,
+            )
+
+        # 5. Publicar subjetivo
+        mensaje_subjetivo = {
+            "tipo": "percepcion_pm10",
+            "valor": p_c,
+            "timestamp": timestamp
+        }
+        await publisher.pubsub_client.publish(
+            topic=topico_geo,
+            channel='subjective',
+            payload=mensaje_subjetivo
+        )
+
+        await asyncio.sleep(interval)
 
 
 if __name__ == "__main__":
