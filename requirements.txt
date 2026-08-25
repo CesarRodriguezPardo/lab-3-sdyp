@@ -4,3 +4,8 @@ pluggy==1.6.0
 Pygments==2.20.0
 pytest==9.1.1
 PyYAML==6.0.3
+pandas>=2.2.0
+plotly>=5.22.0
+streamlit>=1.35.0
+numpy>=1.26.0
+streamlit-autorefresh>=1.0.0

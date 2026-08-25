@@ -53,3 +53,9 @@ pubsub:
 gossip:
   fanout: 2
   timeout: 3.0
+
+metrics:
+  enabled: true
+  interval_dt: 5.0
+  flush_interval: 3
+  # output_dir usa fallback por env vars: CIVICMESH_RUNS/CIVICMESH_RUN_ID/metrics/raw

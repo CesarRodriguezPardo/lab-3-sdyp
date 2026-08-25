@@ -30,3 +30,12 @@ Thumbs.db
 runs/
 hostfile.txt
 *.log
+AGENTS.md
+context
+skills-lock.json
+.opencode
+.agents
+graphify-out
+PROMPT.md
+ARCHITECTURE.md
+PROJECT_MAP.md

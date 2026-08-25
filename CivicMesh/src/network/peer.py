@@ -1,4 +1,5 @@
-import asyncio, json, time
+import asyncio, json, time, os
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 from CivicMesh.src.network.gossip import Gossiper
 from CivicMesh.src.pubsub.message import Message
@@ -15,6 +16,8 @@ from CivicMesh.src.pubsub.channel import (
     ChannelPolicies,
     default_channel_policies,
 )
+from CivicMesh.src.aggregation.state import get_global_state
+from CivicMesh.src.aggregation.metrics import get_metrics_writer
 
 
 class Peer:
@@ -28,6 +31,12 @@ class Peer:
         timeout: float = 3.0,
         channel_policies: Optional[ChannelPolicies] = None,
         on_local_delivery: Optional[Callable[[Message], None]] = None,
+        metrics_enabled: bool = True,
+        metrics_interval: float = 5.0,
+        metrics_run_id: Optional[str] = None,
+        metrics_output_dir: Optional[str] = None,
+        metrics_flush_interval: int = 3,
+        metrics_dominio: str = "unknown",
     ):
         """
         Inicializa un peer.
@@ -47,7 +56,25 @@ class Peer:
             Callback opcional invocado cada vez que un mensaje se
             entrega localmente (ver _deliver_locally). Permite que
             otra capa (p. ej. Agregación, Rol 4) reaccione a
-            mensajes sin acoplar Pub/Sub a su implementación.
+            mensajes sin acoplar Pub/Sub a su implementación concreta.
+
+        metrics_enabled:
+            Habilita la generación de métricas JSONL.
+
+        metrics_interval:
+            Intervalo en segundos entre volcados de métricas.
+
+        metrics_run_id:
+            ID de la corrida (se usa CIVICMESH_RUN_ID si no se provee).
+
+        metrics_output_dir:
+            Directorio de salida para métricas (se usa CIVICMESH_RUNS si no se provee).
+
+        metrics_flush_interval:
+            Cada N volcados hacer flush a disco.
+
+        metrics_dominio:
+            Dominio asociado a este peer (A, B, o "unknown").
         """
 
         # -------------------------
@@ -98,26 +125,72 @@ class Peer:
         # de su implementación concreta.
         self.on_local_delivery = on_local_delivery
 
+        # -------------------------
+        # Métricas (Agregación)
+        # -------------------------
+        self.metrics_enabled = metrics_enabled
+        self.metrics_interval = metrics_interval
+        self.metrics_dominio = metrics_dominio
+        self._metrics_task: Optional[asyncio.Task] = None
+
+        if metrics_enabled:
+            run_id = metrics_run_id or os.environ.get("CIVICMESH_RUN_ID") or f"local-{int(time.time())}"
+            self._state = get_global_state()
+            self._state.set_context(self.gossiper.node_id, run_id, metrics_dominio)
+            self._metrics_writer = get_metrics_writer(
+                run_id=run_id,
+                output_dir=metrics_output_dir,
+                flush_interval=metrics_flush_interval,
+            )
+            # Wrap on_local_delivery to also feed state
+            self._user_on_local_delivery = on_local_delivery
+            self.on_local_delivery = self._on_delivery_with_metrics
+        else:
+            self._state = None
+            self._metrics_writer = None
+            self._user_on_local_delivery = None
+
+        # -------------------------
+        # Robustez: tracking de peers caídos y recuperación
+        # -------------------------
+        self._dead_peers: set = set()  # peers detectados como caídos
+        self._peer_death_times: Dict[str, float] = {}  # peer_id -> timestamp de muerte
+
     async def start(self):
         """Punto de entrada: inicializa el estado y lanza las tareas paralelas."""
 
         self.gossiper.bootstrap_from_file(self.hostfile)
 
-        #Iniciar servidor
+        # Iniciar servidor
         server = await asyncio.start_server(self._handle_client, self.gossiper.node_host, self.gossiper.node_port)
         print(f"[{self.gossiper.node_id}] Escuchando en {self.gossiper.node_host}:{self.gossiper.node_port}")
 
-        #Lanzar tareas en paralelo
+        # Lanzar tareas en paralelo
+        tasks = [
+            self._gossip_loop(),
+            self._failure_detector_loop(),
+            server.serve_forever(),
+        ]
+        if self.metrics_enabled:
+            self._metrics_task = asyncio.create_task(self._metrics_dump_loop())
+            tasks.append(self._metrics_task)
+
         async with server:
             try:
-                await asyncio.gather(
-                    self._gossip_loop(),
-                    self._failure_detector_loop(),
-                    server.serve_forever()
-                )
+                await asyncio.gather(*tasks)
             except asyncio.CancelledError:
                 # Captura la cancelación enviada por asyncio.run() al hacer Ctrl+C
                 pass
+            finally:
+                if self._metrics_task:
+                    self._metrics_task.cancel()
+                    try:
+                        await self._metrics_task
+                    except asyncio.CancelledError:
+                        pass
+                if self._metrics_writer:
+                    self._metrics_writer.flush_all()
+                    self._metrics_writer.close()
 
     async def _handle_client(self, reader, writer):
         """Procesa los mensajes JSON entrantes"""
@@ -328,6 +401,70 @@ class Peer:
             self.on_local_delivery(msg)
 
         return True
+
+    def _on_delivery_with_metrics(self, msg: Message):
+        """Wrapper que alimenta el estado de agregación y llama al callback de usuario."""
+        if not self.metrics_enabled or not self._state:
+            if self._user_on_local_delivery:
+                self._user_on_local_delivery(msg)
+            return
+
+        try:
+            topic_id = msg.topic
+            channel = msg.channel
+            payload = msg.payload
+            ts = msg.timestamp
+
+            # Extraer comuna del topic_id (formato: "comuna:nombre")
+            comuna = topic_id.split(":", 1)[1] if ":" in topic_id else topic_id
+
+            # Extraer valor numérico del payload
+            value = None
+            if isinstance(payload, dict):
+                # Canales comunes: objective tiene "value", "valor" o "count", subjective tiene "indice_inseguridad" o similar
+                for key in ("value", "valor", "count", "indice_inseguridad", "pm10", "pm25", "concentracion"):
+                    if key in payload and isinstance(payload[key], (int, float)):
+                        value = float(payload[key])
+                        break
+
+            if value is not None:
+                asyncio.create_task(self._state.update(comuna, channel, value, ts))
+
+        except Exception:
+            pass  # No dejar que métricas rompan la entrega
+
+        if self._user_on_local_delivery:
+            self._user_on_local_delivery(msg)
+
+    async def _metrics_dump_loop(self):
+        """Bucle periódico que vuelca métricas de convergencia."""
+        while True:
+            try:
+                await asyncio.sleep(self.metrics_interval)
+                if not self.metrics_enabled or not self._state or not self._metrics_writer:
+                    continue
+
+                # Obtener valores objetivo de este peer
+                objective_values = await self._state.get_objective_values()
+
+                # Para convergencia, escribimos para ambos dominios (A y B)
+                # ya que los peers reciben mensajes de ambos.
+                # El post-procesamiento separará por dominio real.
+                for dominio in ("A", "B"):
+                    for comuna, v_i in objective_values.items():
+                        peer_values = {self.gossiper.node_id: v_i}
+                        self._metrics_writer.write_convergence(
+                            peer_id=self.gossiper.node_id,
+                            dominio=dominio,
+                            comuna=comuna,
+                            timestamp=time.time(),
+                            v_i=v_i,
+                            peer_values=peer_values,
+                        )
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"[{self.gossiper.node_id}] Error en metrics dump: {e}")
 
         # =========================================================
         # PUB/SUB - PUBLISH
@@ -832,6 +969,23 @@ class Peer:
                     # Si el socket respondio, el nodo está vivo
                     if pid in self.gossiper.peers_view:
                         self.gossiper.peers_view[pid]["last_seen"] = time.time()
+                        # Detectar recuperación de peer previamente caído
+                        if pid in self._dead_peers:
+                            self._dead_peers.discard(pid)
+                            death_time = self._peer_death_times.pop(pid, None)
+                            recovery_time = time.time() - death_time if death_time else None
+                            print(f"[{self.gossiper.node_id}] Peer recuperado: {pid} (recovery_time={recovery_time:.1f}s)")
+                            if self.metrics_enabled and self._metrics_writer:
+                                self._metrics_writer.write_robustness(
+                                    peer_id=self.gossiper.node_id,
+                                    event="peer_recovered",
+                                    timestamp=time.time(),
+                                    recovery_time=recovery_time,
+                                    msg_dropped=0,
+                                    partition_detected=False,
+                                    stale_ratio=len(self._dead_peers) / max(1, len(self.gossiper.peers_view) + len(self._dead_peers)),
+                                    recovered_peer=pid,
+                                )
                 except Exception:
                     # La falla lo procesa el purge_dead_peers
                     pass
@@ -848,6 +1002,24 @@ class Peer:
             dead_peers = self.gossiper.purge_dead_peers()
             if dead_peers:
                 print(f"[{self.gossiper.node_id}] Nodos detectados como caídos: {dead_peers}")
+                now = time.time()
+                # Track dead peers for recovery detection
+                for dead_peer in dead_peers:
+                    self._dead_peers.add(dead_peer)
+                    self._peer_death_times[dead_peer] = now
+                # Registrar métrica de robustez: caída de peers
+                if self.metrics_enabled and self._metrics_writer:
+                    for dead_peer in dead_peers:
+                        self._metrics_writer.write_robustness(
+                            peer_id=self.gossiper.node_id,
+                            event="peer_killed",
+                            timestamp=now,
+                            recovery_time=None,
+                            msg_dropped=0,
+                            partition_detected=False,
+                            stale_ratio=len(dead_peers) / max(1, len(self.gossiper.peers_view) + len(dead_peers)),
+                            dead_peer=dead_peer,
+                        )
 
     async def subscribe(
         self,
