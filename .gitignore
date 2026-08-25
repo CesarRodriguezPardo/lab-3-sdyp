@@ -1,8 +1,32 @@
-hostfile.txt
-
-# Archivos compilados y carpetas de caché de Python
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
 
+# Virtual environments
+venv/
 .venv/
+env/
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CivicMesh runs (shared FS convention) & metrics
+runs/
+hostfile.txt
+*.log
