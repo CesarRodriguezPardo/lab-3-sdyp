@@ -38,7 +38,7 @@ def check_socket_timeout(path: Path, lines: list[str]) -> list[dict]:
                     "kind": "mechanical",
                     "title": f"{TITLE_PREFIX} socket sin timeout -- {path.relative_to(REPO_ROOT)}",
                     "body": f"Linea {i+1}: `socket.connect()` sin timeout.\n\n"
-                            f"```python\n{socket.settimeout(5.0)}\n```\n\n"
+                            f"```python\nsock.settimeout(5.0)\n```\n\n"
                             f"En sistemas distribuidos, un socket sin timeout puede "
                             f"bloquear indefinidamente ante caida de un peer.",
                 })

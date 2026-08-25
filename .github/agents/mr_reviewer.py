@@ -13,9 +13,9 @@ from common import (
     get_pr, get_pr_files, load_event, require_gemini,
 )
 
-HUMAN_PREFIXES = ("src/", "civicmesh/", "gossip/", "pubsub/")
+HUMAN_PREFIXES = ("CivicMesh/src/", "src/", "network/", "pubsub/", "domains/")
 DOC_EXTENSIONS = (".md", ".txt", ".rst")
-CONFIG_EXTENSIONS = (".yml", ".yaml", ".toml", ".cfg", ".ini")
+CONFIG_EXTENSIONS = (".yml", ".yaml", ".toml", ".cfg", ".ini", ".json")
 ISSUE_REF = re.compile(r"(?:Closes|Fixes|Refs)\s+#\d+", re.IGNORECASE)
 
 
@@ -39,16 +39,20 @@ def resolve_pr_context() -> tuple[int | None, str | None, str]:
 def classify(files: list[dict]) -> tuple[str, list[str]]:
     human_reasons: list[str] = []
     for f in files:
-        name = f["filename"]
+        name = f.get("filename", "")
         if name.endswith(DOC_EXTENSIONS):
             continue
-        if name.endswith(CONFIG_EXTENSIONS) or "tests/" in name or name.startswith((".github/", "scripts/")):
+        if "tests/" in name or name.startswith((".github/", "scripts/")):
             continue
-        if name.endswith(".py"):
+        if name.endswith(CONFIG_EXTENSIONS) or name in ("requirements.txt", "Dockerfile", "docker-compose.yml", ".gitignore", "conftest.py"):
             continue
-        human_reasons.append(f"archivo no clasificado: `{name}`")
+        if any(name.startswith(p) for p in HUMAN_PREFIXES):
+            human_reasons.append(f"cambios en lógica de protocolo/dominio: `{name}`")
+            continue
+        human_reasons.append(f"archivo con potencial impacto: `{name}`")
+
     if not human_reasons:
-        return "mechanical", ["solo documentacion, tests, config o .py estandar"]
+        return "mechanical", ["solo documentación, tests, configuración o tooling"]
     return "human", human_reasons
 
 
