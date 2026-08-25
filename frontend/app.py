@@ -252,12 +252,19 @@ def render_robustness(metrics: dict):
 
     st.header("Robustez — Caída / Partición")
 
+    # Determinar columnas de hover disponibles
+    hover_cols = ["peer_id", "msg_dropped", "stale_ratio", "partition_detected"]
+    if "dead_peer" in df.columns:
+        hover_cols.append("dead_peer")
+    if "recovered_peer" in df.columns:
+        hover_cols.append("recovered_peer")
+
     fig = px.scatter(
         df,
         x="timestamp",
         y="recovery_time_s",
         color="event",
-        hover_data=["peer_id", "host", "msg_dropped", "stale_ratio"],
+        hover_data=hover_cols,
         title="Tiempo de recuperación tras eventos",
         labels={"recovery_time_s": "Recovery time (s)", "timestamp": "Tiempo"},
     )
