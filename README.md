@@ -12,9 +12,9 @@ Framework P2P de Publish/Subscribe para monitoreo ciudadano distribuido basado e
 
 | Nombre                | Rol                         | Responsabilidades                                                                                            |
 | :-------------------- | :-------------------------- | :----------------------------------------------------------------------------------------------------------- |
-| _(nombre)_            | 1 — Capa de Red / Gossip    | Membresía, descubrimiento, tolerancia a fallos, vista parcial.                                               |
-| _(nombre)_            | 2 — Capa Pub/Sub            | Tópicos geográficos, suscripciones, `should_forward`, fanout, canales objetivo/subjetivo.                    |
-| _(nombre)_            | 3 — Datos                   | Ingesta/cache SINCA/Open-Meteo, replay determinista, generadores Poisson y modelos de percepción.            |
+| **Martin Salinas**            | 1 — Capa de Red / Gossip    | Membresía, descubrimiento, tolerancia a fallos, vista parcial.                                               |
+| **Sofía Gacitúa**            | 2 — Capa Pub/Sub            | Tópicos geográficos, suscripciones, `should_forward`, fanout, canales objetivo/subjetivo.                    |
+| **Nicolás García**            | 3 — Datos                   | Ingesta/cache SINCA/Open-Meteo, replay determinista, generadores Poisson y modelos de percepción.            |
 | **Sebastián Cassone** | 4 — Analítica y Estadística | Métricas de convergencia y divergencia, experimentos de fallo/partición, frontend de estadísticas.           |
 | **César Rodríguez**   | 5 — CI/CD, Git y Agentes    | Pipeline CI verde con tests, Dockerfile y docker-compose, scripts Slurm/Shared FS, 3 agentes de IA y README. |
 
