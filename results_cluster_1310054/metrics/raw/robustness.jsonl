@@ -1,0 +1,1 @@
+{"type": "robustness", "run_id": "1310054", "timestamp": "2026-08-26T00:25:19Z", "peer_id": "xigpu01:9001", "dominio": "unknown", "comuna": "unknown", "canal": "unknown", "event": "peer_killed", "recovery_time_s": null, "msg_dropped": 6, "partition_detected": false, "stale_ratio": 0.3333, "dead_peer": "xicpu03:8002"}

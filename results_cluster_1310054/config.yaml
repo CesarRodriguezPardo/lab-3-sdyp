@@ -1,0 +1,61 @@
+geography:
+  level: comuna
+
+  topics:
+    - Santiago
+    - Providencia
+    - Ñuñoa
+    - Maipú
+    - Las Condes
+    - La Florida
+
+  neighbors:
+    Santiago:
+      - Providencia
+      - Maipú
+
+    Providencia:
+      - Santiago
+      - Ñuñoa
+      - Las Condes
+
+    Ñuñoa:
+      - Providencia
+      - La Florida
+      - Las Condes
+
+    Maipú:
+      - Santiago
+      - La Florida
+
+    Las Condes:
+      - Providencia
+      - Ñuñoa
+      - La Florida
+
+    La Florida:
+      - Ñuñoa
+      - Maipú
+      - Las Condes
+
+pubsub:
+  channels:
+    objective:
+      ttl: 5
+      priority: 3
+      fanout: 3
+
+    subjective:
+      ttl: 3
+      priority: 1
+      fanout: 2
+
+gossip:
+  fanout: 2
+  timeout: 3.0
+
+metrics:
+  enabled: true
+  interval_dt: 5.0
+  flush_interval: 3
+  # output_dir usa fallback por env vars: CIVICMESH_RUNS/CIVICMESH_RUN_ID/metrics/raw
