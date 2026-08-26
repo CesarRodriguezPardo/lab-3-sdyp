@@ -1,0 +1,49 @@
+{
+  "run_id": "1310054",
+  "parametros": {
+    "fanout": 2,
+    "timeout": 3.0,
+    "objective_ttl": 5,
+    "subjective_ttl": 3,
+    "alpha": 0.8
+  },
+  "dominios": {
+    "A": {
+      "convergencia": {
+        "divergencia_max_promedio": 0.0,
+        "divergencia_max_max": 0.0,
+        "divergencia_media_promedio": 0.0,
+        "varianza_promedio": 0.0,
+        "n_peers": 2,
+        "n_comunas": 1,
+        "tiempo_convergencia_promedio_s": 0.0
+      },
+      "brecha": {
+        "brecha_abs_promedio": 0.316312,
+        "brecha_abs_max": 0.316312,
+        "brecha_rel_promedio": 0.0,
+        "sesgo_promedio": 0.316312,
+        "brecha_ema_promedio": 0.0
+      }
+    },
+    "B": {
+      "convergencia": {
+        "divergencia_max_promedio": 0.0,
+        "divergencia_max_max": 0.0,
+        "divergencia_media_promedio": 0.0,
+        "varianza_promedio": 0.0,
+        "n_peers": 2,
+        "n_comunas": 1,
+        "tiempo_convergencia_promedio_s": 0.0
+      },
+      "brecha": {
+        "brecha_abs_promedio": 52.355229,
+        "brecha_abs_max": 52.355229,
+        "brecha_rel_promedio": 1.586522,
+        "sesgo_promedio": 52.355229,
+        "brecha_ema_promedio": 47.531272
+      }
+    }
+  },
+  "duracion_total_s": 194.0
+}

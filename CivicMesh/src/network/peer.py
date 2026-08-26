@@ -155,6 +155,7 @@ class Peer:
         # -------------------------
         self._dead_peers: set = set()  # peers detectados como caídos
         self._peer_death_times: Dict[str, float] = {}  # peer_id -> timestamp de muerte
+        self._msg_dropped_counter: int = 0  # mensajes que fallaron al enviar
 
     async def start(self):
         """Punto de entrada: inicializa el estado y lanza las tareas paralelas."""
@@ -926,7 +927,7 @@ class Peer:
                 ]["last_seen"] = time.time()
 
         except Exception as e:
-
+            self._msg_dropped_counter += 1
             print(
                 f"[{self.gossiper.node_id}] "
                 f"No se pudo enviar "
@@ -976,12 +977,14 @@ class Peer:
                             recovery_time = time.time() - death_time if death_time else None
                             print(f"[{self.gossiper.node_id}] Peer recuperado: {pid} (recovery_time={recovery_time:.1f}s)")
                             if self.metrics_enabled and self._metrics_writer:
+                                dropped = self._msg_dropped_counter
+                                self._msg_dropped_counter = 0
                                 self._metrics_writer.write_robustness(
                                     peer_id=self.gossiper.node_id,
                                     event="peer_recovered",
                                     timestamp=time.time(),
                                     recovery_time=recovery_time,
-                                    msg_dropped=0,
+                                    msg_dropped=dropped,
                                     partition_detected=False,
                                     stale_ratio=len(self._dead_peers) / max(1, len(self.gossiper.peers_view) + len(self._dead_peers)),
                                     recovered_peer=pid,
@@ -1007,17 +1010,24 @@ class Peer:
                 for dead_peer in dead_peers:
                     self._dead_peers.add(dead_peer)
                     self._peer_death_times[dead_peer] = now
+                # Detectar partición: >50% de los peers conocidos están muertos
+                total_peers = len(self.gossiper.peers_view) + len(self._dead_peers)
+                partition_detected = len(self._dead_peers) > total_peers / 2 if total_peers > 0 else False
+                if partition_detected:
+                    print(f"[{self.gossiper.node_id}] PARTICIÓN DETECTADA: {len(self._dead_peers)}/{total_peers} peers muertos")
                 # Registrar métrica de robustez: caída de peers
                 if self.metrics_enabled and self._metrics_writer:
+                    dropped = self._msg_dropped_counter
+                    self._msg_dropped_counter = 0  # Resetear después de reportar
                     for dead_peer in dead_peers:
                         self._metrics_writer.write_robustness(
                             peer_id=self.gossiper.node_id,
                             event="peer_killed",
                             timestamp=now,
                             recovery_time=None,
-                            msg_dropped=0,
-                            partition_detected=False,
-                            stale_ratio=len(dead_peers) / max(1, len(self.gossiper.peers_view) + len(dead_peers)),
+                            msg_dropped=dropped,
+                            partition_detected=partition_detected,
+                            stale_ratio=len(self._dead_peers) / max(1, len(self.gossiper.peers_view) + len(self._dead_peers)),
                             dead_peer=dead_peer,
                         )
 
