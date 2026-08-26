@@ -41,11 +41,8 @@ def gemini_enabled() -> bool:
 def require_gemini() -> None:
     if gemini_enabled():
         return
-    msg = "GEMINI_API_KEY no configurado."
-    if os.environ.get("GITHUB_ACTIONS") == "true":
-        print(f"[fatal] {msg}")
-        raise SystemExit(1)
-    print(f"[warning] {msg} Modo local: reglas programaticas.")
+    msg = "GEMINI_API_KEY no configurado. Ejecutando en modo de reglas programáticas."
+    print(f"[warning] {msg}")
 
 
 def _headers() -> dict:

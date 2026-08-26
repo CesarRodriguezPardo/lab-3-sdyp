@@ -45,17 +45,30 @@ def rule_based_findings() -> list[dict]:
             "body": "No existe README.md. Crees uno con roles, instalacion y flujo Git.",
         })
     else:
-        url_match = re.search(r"URL del Repositorio:\*\*\s*\[\s*\]", readme) or \
-                    re.search(r"Repositorio:\*\*\s*\[\s*\]", readme)
-        if url_match:
+        if re.search(r"\|\s*_\(nombre\)_\s*\|\s*1\s*—", readme) or "| _(nombre)_" in readme:
+            fixed_readme = re.sub(
+                r"\|\s*_\(nombre\)_\s*\|\s*1\s*—\s*Capa de Red / Gossip",
+                "| **Nicolás García**     | 1 — Capa de Red / Gossip",
+                readme,
+            )
+            fixed_readme = re.sub(
+                r"\|\s*_\(nombre\)_\s*\|\s*2\s*—\s*Capa Pub/Sub",
+                "| **Sofía Gacitúa**       | 2 — Capa Pub/Sub",
+                fixed_readme,
+            )
+            fixed_readme = re.sub(
+                r"\|\s*_\(nombre\)_\s*\|\s*3\s*—\s*Datos",
+                "| **Martín Salinas**     | 3 — Datos",
+                fixed_readme,
+            )
             findings.append({
                 "kind": "mechanical",
-                "title": f"{TITLE_PREFIX} URL del repositorio vacia en README.md",
-                "body": "Placeholder vacio en la URL del repositorio.",
+                "title": f"{TITLE_PREFIX} auto-fill team members in README.md",
+                "body": "Actualización automática de los nombres de los integrantes del equipo en la tabla de roles del README.md.",
                 "fix_path": "README.md",
-                "fix_content": readme.replace("**Repositorio:** []", f"**Repositorio:** [{_repo_url()}]({_repo_url()})"),
-                "fix_commit_msg": "docs(readme): fill repository URL",
-                "pr_title": "docs(readme): fill repository URL (auto-fix)",
+                "fix_content": fixed_readme,
+                "fix_commit_msg": "docs(readme): auto-fill team member names",
+                "pr_title": "docs(readme): auto-fill team member names (auto-fix)",
             })
 
     if changelog is None:

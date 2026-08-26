@@ -11,3 +11,4 @@ streamlit>=1.35.0
 numpy>=1.26.0
 streamlit-autorefresh>=1.0.0
 matplotlib>=3.8.0
+requests>=2.31.0
