@@ -1,34 +1,52 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=civicmesh-frontend
+#SBATCH --job-name=civicmesh-fe
 #SBATCH --partition=GPU
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time=01:00:00
-#SBATCH --output=%x-%j.out
-#SBATCH --error=%x-%j.err
-# Nota: --gres=gpu:A30:0 (solo CPU del host)
+#SBATCH --time=02:00:00
+#SBATCH --output=frontend-%j.out
+#SBATCH --error=frontend-%j.err
 
-# frontend.slurm — Levanta Streamlit frontend en nodo GPU (solo CPU)
+# ==============================================================================
+# CivicMesh — Job 3: Frontend Streamlit (solo CPU del host GPU)
+# Requiere: export CIVICMESH_RUN_ID=<job_id_del_job_1>
+# ==============================================================================
 
 set -euo pipefail
 
-source "$(dirname "$0")/bootstrap.sh"
+RUN_ID="${CIVICMESH_RUN_ID:?Error: CIVICMESH_RUN_ID no definido. Usa: export CIVICMESH_RUN_ID=<job_id>}"
+CIVICMESH_RUNS="${CIVICMESH_RUNS:-$PWD/runs}"
+RUN_DIR="${CIVICMESH_RUNS}/${RUN_ID}"
+REPO_DIR="/home/ceph/scassone/repos/civicmesh"
 
-METRICS_DIR="${RUN_DIR}/metrics"
+echo "================================================================="
+echo "Frontend Streamlit — RUN_ID: ${RUN_ID}"
+echo "RUN_DIR: ${RUN_DIR}"
+echo "================================================================="
 
-echo "[Frontend] Iniciando Streamlit en ${NODES[0]}"
-echo "[Frontend] Métricas: ${METRICS_DIR}"
-echo "[Frontend] RUN_ID=${CIVICMESH_RUN_ID}"
+METRICS_DIR="${RUN_DIR}/metrics/raw"
 
-export PYTHONPATH=".:CivicMesh"
+echo "[Frontend] Esperando métricas en ${METRICS_DIR}..."
+for i in $(seq 1 30); do
+    if [[ -d "${METRICS_DIR}" ]] && ls "${METRICS_DIR}"/*.jsonl &>/dev/null; then
+        echo "[Frontend] Métricas encontradas:"
+        ls -la "${METRICS_DIR}/"
+        break
+    fi
+    echo "[Frontend] Esperando métricas... (${i}/30)"
+    sleep 5
+done
+
+export PYTHONPATH="${REPO_DIR}:${REPO_DIR}/CivicMesh"
 export PYTHONUNBUFFERED=1
 
-cd "$(dirname "$0")/../.."
+FE_PORT=8501
 
-# Streamlit en puerto 8501
-streamlit run frontend/app.py \
-    --server.port 8501 \
+echo "[Frontend] Iniciando Streamlit en puerto ${FE_PORT}"
+
+~/.local/bin/streamlit run "${REPO_DIR}/frontend/app.py" \
+    --server.port "${FE_PORT}" \
     --server.address 0.0.0.0 \
     --server.headless true \
     -- \
